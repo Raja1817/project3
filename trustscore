@@ -1,0 +1,171 @@
+import socket
+import ujson
+import threading
+import random
+import math
+import time
+from os import *
+
+#method=dict()
+#dict={"command":["Correctness","Agreement","Expectations"], "source":[1,2,3],"data":[["x"],[r1,r2],[r1]]}
+thislist=[("192.168.1.204s",12001) ]
+TrustScore=dict()
+for i in thislist:
+    TrustScore[i[0]]=0.5
+
+interval=0.5
+alpha = 0.2
+beta = 0.1
+port1 = 12001
+port2 = 12002
+method_list=[("Correctness"),("Agreement"),("Expectation")]
+random_create=random.choice(method_list)
+
+#parameter correct
+# correct = 1
+
+s1=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s2=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# print(socket.AF_INET)
+print("socket created")
+
+s1.bind(('',port1) )
+s2.bind(('',port2) )
+print("socket binded to 12001 and 12002")
+
+
+# Function for changing trust score
+def nextScore(currentScore,trustBool):
+    if trustBool:
+        return (1.0 -(1.0-currentScore)*math.exp(-beta))
+    else:
+        return currentScore*math.exp(-alpha)
+
+
+
+def thread1():
+    while True:
+        d1,addr =s1.recvfrom(1024)
+        data1 =ujson.loads(d1.decode('utf-8'))
+        #while True:
+        if(data1=="Correctness"):
+            #while True:
+            d,addr =s1.recvfrom(1024)
+            data =ujson.loads(d.decode('utf-8'))
+            print(data,addr)
+            print("T1 : received {} from {} ".format(data,addr))
+            rand=random.uniform(0,1)
+            if  rand< 0.4:
+               x="hallo"
+            else:
+               x=data
+            s1.sendto(ujson.dumps(x,rand).encode('utf-8'),(addr[0],port2))
+        elif(data1=="Agreement"):
+            #while True:
+            d,addr =s1.recvfrom(1024)
+            data =ujson.loads(d.decode('utf-8'))
+            print("received {} from {} ".format(data,addr[0]))
+            print("Acknowledgement")
+            x="ACK"
+            s1.sendto(ujson.dumps(x).encode('utf-8'),(addr[0],port2))
+            # receiving the Random number
+            T,addr =s1.recvfrom(1024)
+            r1 =float(ujson.loads(T.decode('utf-8')))
+            print("received {} from {} ".format(r1,addr[0]))
+            r2=random.uniform(0,1)
+            # Checking whether r1 and r2 are aggreeing or not
+            if (r1 < interval and r2 < interval):
+                print("Increased trust score")
+                TrustScore[addr[0]] = nextScore( TrustScore[addr[0]] , True)
+                print(TrustScore[addr[0]])
+            else:
+                print("Decreased trust score")
+                TrustScore[addr[0]] = nextScore( TrustScore[addr[0]] , False)
+                print(TrustScore[addr[0]])
+        else:
+        #while True:
+            rr1,addr =s1.recvfrom(1024)
+            #print(d,addr)
+            reci1 =ujson.loads(rr1.decode('utf-8'))
+            print("received {} from {} ".format(reci1,addr))
+            #print("T1 : Acknowledgement")
+            #x="ACK"
+            #s1.sendto(ujson.dumps(x).encode('utf-8'),(addr[0],port2))
+            # receiving the Random number
+            rr2, addr =s1.recvfrom(1024)
+            reci2=ujson.loads(rr2.decode('utf-8'))
+            print("received {} from {} ".format(reci2,addr))
+            #r2=random.uniform(0,10)
+
+            print('Sum up the random numbers ',reci1,'and ',reci2)
+            random_variable=random.uniform(0,1)
+            print(random_variable)
+            if random_variable<=0.4:
+                value=reci1+reci2
+            else:
+                value=reci1-reci2
+            #.sum=input("Enter the sum:")
+            s1.sendto(ujson.dumps(value).encode('utf-8'),(addr[0],port2))
+def thread2():
+    while True:
+            time.sleep(1)
+            neighbour=random.choice(thislist)
+            s2.sendto(ujson.dumps(random_create).encode('utf-8'),neighbour)
+            if(random_create=="Correctness"):
+                #while True:
+                #time.sleep(1)
+                #neighbour=random.choice(thislist)
+                #s2.sendto(ujson.dumps(random_create).encode('utf-8'),neighbour)
+                msg1="Hello"
+                s2.sendto(ujson.dumps(msg1).encode('utf-8'),neighbour)
+                m, addr =s2.recvfrom(1024)
+                msg2 =ujson.loads(m.decode('utf-8'))
+                if msg1==msg2:
+                    print("Increasing Trust Score")
+                    TrustScore[addr[0]] = nextScore( TrustScore[addr[0]] , True)
+                else:
+                    print("Decreasing Trust Score")
+                    TrustScore[addr[0]] = nextScore( TrustScore[addr[0]] , False)
+                print(TrustScore[addr[0]])
+            elif(random_create=="Agreement"):
+                #while True:
+                #time.sleep(1)
+                #neighbour=random.choice(thislist)
+                #s2.sendto(ujson.dumps(random_create).encode('utf-8'),neighbour)
+                msg1="request to connect"
+                s2.sendto(ujson.dumps(msg1).encode('utf-8'),neighbour)
+                m,addr =s2.recvfrom(1024)
+                x1 =ujson.loads(m.decode('utf-8'))
+                if x1 is "NACK":
+                    continue
+                msg=random.uniform(0,1)
+                s2.sendto(ujson.dumps(msg).encode('utf-8'),neighbour)
+            else:
+            #while True:
+                #time.sleep(1)
+                #neighbour=random.choice(thislist)
+                #s2.sendto(ujson.dumps(random_create).encode('utf-8'),neighbour)
+                r1=random.randint(0,10)
+                s2.sendto(ujson.dumps(r1).encode('utf-8'),neighbour)
+                print(r1)
+                r2=random.randint(0,10)
+                s2.sendto(ujson.dumps(r2).encode('utf-8'),neighbour)
+                print(r2)
+                r3=r1+r2
+                print("Expected sum {}".format(r3))
+                sum1, addr =s2.recvfrom(1024)
+                total=ujson.loads(sum1.decode('utf-8'))
+                print("Sum got {} ".format(total))
+                print("received {} from {} ".format(total,neighbour))
+                if r3==float(total):
+                    print("Increasing Trust Score")
+                    TrustScore[addr[0]] = nextScore( TrustScore[addr[0]] , True)
+                else:
+                    TrustScore[addr[0]] = nextScore( TrustScore[addr[0]] , False)
+                print(TrustScore[addr[0]])
+
+
+t1=threading.Thread(target=thread1)
+t2=threading.Thread(target=thread2)
+t1.start()
+t2.start()
